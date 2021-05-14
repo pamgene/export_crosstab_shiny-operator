@@ -1,64 +1,83 @@
 library(shiny)
 library(tercen)
 library(dplyr)
-library(tidyr)
 
 ############################################
 #### This part should not be included in ui.R and server.R scripts
 getCtx <- function(session) {
-  ctx <- tercenCtx(stepId = "9b7619c7-4d66-49fa-9bb3-2b06209e58e4",
-                   workflowId = "f81d245ef22a2ff192ed2533a6002ec3")
+  # Set appropriate options
+  #options("tercen.serviceUri"="http://tercen:5400/api/v1/")
+  #options("tercen.workflowId"= "4133245f38c1411c543ef25ea3020c41")
+  #options("tercen.stepId"= "2b6d9fbf-25e4-4302-94eb-b9562a066aa5")
+  #options("tercen.username"= "admin")
+  #options("tercen.password"= "admin")
+  ctx <- tercenCtx()
   return(ctx)
 }
 ####
 ############################################
 
 ui <- shinyUI(fluidPage(
-  
-  titlePanel("Histogram"),
-  
-  sidebarPanel(
-    sliderInput("plotWidth", "Plot width (px)", 200, 2000, 500),
-    sliderInput("plotHeight", "Plot height (px)", 200, 2000, 500),
-  ),
-  
-  mainPanel(
-    uiOutput("reacOut")
-  )
-  
+  uiOutput("reacOut"),
+  title = "Export Crosstab"
 ))
 
 server <- shinyServer(function(input, output, session) {
   
+  rawData <- reactive({
+    getRawData(session)
+  })
+  
   dataInput <- reactive({
-    getValues(session)
+    getData(session, rawData())
   })
   
   output$reacOut <- renderUI({
-    plotOutput(
-      "main.plot",
-      height = input$plotHeight,
-      width = input$plotWidth
+    tagList(
+      HTML("<h3><center>Export Crosstab</center></h3>"),
+      fluidRow(
+        column(1),
+        column(5, verbatimTextOutput("summary")),
+        column(2, shiny::downloadButton("downloadData", "Export Crosstab file")))
     )
-  }) 
-  
-  output$main.plot <- renderPlot({
-    values <- dataInput()
-    data <- values$data$.y
-    hist(data)
   })
   
+  output$summary <- renderText({
+    ctx       <- getCtx(session)
+    raw_data  <- rawData()
+    col_names <- ctx$cnames %>% unlist()
+    paste(paste("Number of rows:", nrow(raw_data)),
+          paste("Number of cols:", ncol(raw_data)),
+          paste("Column names:",  paste(col_names, collapse = ",")), sep="\n")
+  })
+  
+  output$downloadData <- downloadHandler(
+    filename = function() {
+      "export.csv"
+    },
+    content = function(con) {
+      write.csv(dataInput(), con)
+    }
+  )
 })
 
-getValues <- function(session){
-  ctx <- getCtx(session)
-  values <- list()
+getRawData <- function(session) {
+  getCtx(session)$as.matrix()  
+}
 
-  values$data <- ctx %>% select(.y, .ri, .ci) %>%
-    group_by(.ci, .ri) %>%
-    summarise(.y = mean(.y)) # take the mean of multiple values per cell
-
-  return(values)
+getData <- function(session, raw_data){
+  ctx           <- getCtx(session)
+  channels      <- ctx$rselect() %>% pull()
+  col_names     <- ctx$cnames %>% unlist()
+  # some columns might be of character type, but the input for flowFrame should be a numeric matrix
+  columns       <- ctx$cselect() %>% 
+    mutate_if(is.character, as.factor) %>% 
+    mutate_if(is.factor, as.numeric) %>% 
+    replace(is.na(.), 0)
+  res           <- as.matrix(cbind(t(raw_data), columns)) 
+  colnames(res) <- c(channels, col_names)
+  
+  return(res)
 }
 
 runApp(shinyApp(ui, server))  

@@ -1,8 +1,8 @@
-# Template Shiny operator for Tercen
+# Export Crosstab Shiny_operator for Tercen
 
 ##### Description
 
-The `Template Shiny operator` is a template repository for the creation of Shiny operators in Tercen.
+The `export_crosstab_shiny_operator` is used to export a view in Tercen in the crosstab file format.
 
 ##### Usage
 
@@ -25,4 +25,4 @@ Details on the computation.
 
 ##### See Also
 
-[template_R_operator](https://github.com/tercen/template_R_operator)
+[write_fcs_shiny_operator](https://github.com/tercen/write_fcs_shiny_operator)
