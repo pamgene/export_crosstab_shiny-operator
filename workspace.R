@@ -38,7 +38,8 @@ server <- shinyServer(function(input, output, session) {
       fluidRow(
         column(1),
         column(5, verbatimTextOutput("summary")),
-        column(2, shiny::downloadButton("downloadData", "Export Crosstab file")))
+        column(2, shiny::downloadButton("downloadData", "Export Crosstab file")),
+        column(2, checkboxInput("collapseCols", "Collapse columns", TRUE)))
     )
   })
   
@@ -46,8 +47,10 @@ server <- shinyServer(function(input, output, session) {
     ctx       <- getCtx(session)
     raw_data  <- rawData()
     col_names <- ctx$cnames %>% unlist()
+    row_names <- ctx$rnames %>% unlist()
     paste(paste("Number of rows:", nrow(raw_data)),
           paste("Number of cols:", ncol(raw_data)),
+          paste("Row names:",  paste(row_names, collapse = ",")),
           paste("Column names:",  paste(col_names, collapse = ",")), sep="\n")
   })
   
@@ -56,7 +59,7 @@ server <- shinyServer(function(input, output, session) {
       "export.csv"
     },
     content = function(con) {
-      write.csv(dataInput(), con)
+      write.table(dataInput(), con, sep="\t", col.names = TRUE, row.names = FALSE)
     }
   )
 })
@@ -65,19 +68,20 @@ getRawData <- function(session) {
   getCtx(session)$as.matrix()  
 }
 
-getData <- function(session, raw_data){
-  ctx           <- getCtx(session)
-  channels      <- ctx$rselect() %>% pull()
-  col_names     <- ctx$cnames %>% unlist()
-  # some columns might be of character type, but the input for flowFrame should be a numeric matrix
-  columns       <- ctx$cselect() %>% 
-    mutate_if(is.character, as.factor) %>% 
-    mutate_if(is.factor, as.numeric) %>% 
-    replace(is.na(.), 0)
-  res           <- as.matrix(cbind(t(raw_data), columns)) 
-  colnames(res) <- c(channels, col_names)
+getData <- function(session, raw_data) {
+  ctx        <- getCtx(session)
+  row_names  <- names(ctx$rnames)
+  col_values <- ctx$cselect()
+  row_values <- ctx$rselect() %>% pull()
   
-  return(res)
+  new_col_names <- col_values %>% 
+    mutate(newcol = apply(col_values[, colnames(col_values)], 1, paste, collapse = "_")) %>% 
+    pull(newcol)
+  result        <- data.frame(raw_data) %>% 
+    mutate(!!row_names := row_values) %>% 
+    select(!!row_names, everything())
+  colnames(result) <- c(row_names, new_col_names)
+  result
 }
 
 runApp(shinyApp(ui, server))  
