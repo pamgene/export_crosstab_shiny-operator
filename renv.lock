@@ -358,6 +358,13 @@
       "Repository": "RSPM",
       "Hash": "caf4781c674ffa549a4676d2d77b13cc"
     },
+    "writexl": {
+      "Package": "writexl",
+      "Version": "1.4.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "edd181b6e10c87497db16d1f8c0d4ed5"
+    },
     "xtable": {
       "Package": "xtable",
       "Version": "1.8-4",

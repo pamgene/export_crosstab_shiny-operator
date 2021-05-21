@@ -1,6 +1,7 @@
 library(shiny)
 library(tercen)
 library(dplyr)
+library(writexl)
 
 ############################################
 #### This part should not be included in ui.R and server.R scripts
@@ -39,7 +40,8 @@ server <- shinyServer(function(input, output, session) {
         column(1),
         column(5, verbatimTextOutput("summary")),
         column(2, shiny::downloadButton("downloadData", "Export Crosstab file")),
-        column(2, checkboxInput("collapseCols", "Collapse columns", TRUE)))
+        column(2, checkboxInput("collapseCols", "Collapse columns", TRUE)),
+        column(2, radioButtons("format", "File format", choices = c("tsv", "xlsx"), selected = "tsv")))
     )
   })
   
@@ -56,10 +58,14 @@ server <- shinyServer(function(input, output, session) {
   
   output$downloadData <- downloadHandler(
     filename = function() {
-      "export.csv"
+      paste0("export.", input$format)
     },
     content = function(con) {
-      write.table(dataInput(), con, sep="\t", col.names = TRUE, row.names = FALSE)
+      if (input$format == "tsv") {
+        write.table(dataInput(), con, sep="\t", col.names = TRUE, row.names = FALSE)
+      } else {
+        write_xlsx(dataInput(), con)
+      }
     }
   )
 })
