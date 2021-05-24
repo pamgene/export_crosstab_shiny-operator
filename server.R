@@ -25,7 +25,7 @@ shinyServer(function(input, output, session) {
   })
   
   dataInput <- reactive({
-    getData(session, rawData())
+    getData(session, rawData(), input$collapseCols, input$collapseRows)
   })
   
   output$reacOut <- renderUI({
@@ -35,8 +35,9 @@ shinyServer(function(input, output, session) {
         column(1),
         column(5, verbatimTextOutput("summary")),
         column(2, shiny::downloadButton("downloadData", "Export Crosstab file")),
-        column(2, checkboxInput("collapseCols", "Collapse columns", TRUE)),
-        column(2, radioButtons("format", "File format", choices = c("tsv", "xlsx"), selected = "tsv")))
+        column(1, checkboxInput("collapseCols", "Collapse columns", TRUE)),
+        column(1, checkboxInput("collapseRows", "Collapse rows", TRUE)),
+        column(1, radioButtons("format", "File format", choices = c("tsv", "xlsx"), selected = "tsv")))
     )
   })
   
@@ -69,18 +70,41 @@ getRawData <- function(session) {
   getCtx(session)$as.matrix()  
 }
 
-getData <- function(session, raw_data) {
+getData <- function(session, raw_data, collapse_cols, collapse_rows) {
   ctx        <- getCtx(session)
   row_names  <- names(ctx$rnames)
   col_values <- ctx$cselect()
-  row_values <- ctx$rselect() %>% pull()
+  row_values <- ctx$rselect()
   
-  new_col_names <- col_values %>% 
-    mutate(newcol = apply(col_values[, colnames(col_values)], 1, paste, collapse = "_")) %>% 
-    pull(newcol)
-  result        <- data.frame(raw_data) %>% 
-    mutate(!!row_names := row_values) %>% 
-    select(!!row_names, everything())
-  colnames(result) <- c(row_names, new_col_names)
+  new_col_names <- col_values
+  if (ncol(col_values) == 1) {
+    new_col_names <- new_col_names %>% pull()
+  } else {
+    if (collapse_cols) {
+      new_col_names <- col_values %>% 
+        mutate(newcol = apply(col_values[, colnames(col_values)], 1, paste, collapse = "_")) %>% 
+        pull(newcol)
+    } else {
+      new_col_names <- new_col_names %>% pull()
+    }
+  }
+  
+  new_row_names <- row_names
+  if (ncol(row_values) == 1) {
+    result <- cbind(row_values, data.frame(raw_data))
+  } else {
+    if (collapse_rows) {
+      new_row_names  <- paste(row_names, collapse = "_")
+      new_row_values <- row_values %>% 
+        mutate(!!new_row_names := apply(row_values[, colnames(row_values)], 1, paste, collapse = "_")) %>% 
+        pull(!!new_row_names)
+      result <- data.frame(raw_data) %>% 
+        mutate(!!new_row_names := new_row_values) %>% 
+        select(!!new_row_names, everything())
+    } else {
+      result <- cbind(row_values, data.frame(raw_data))
+    }
+  }
+  colnames(result) <- c(new_row_names, new_col_names)
   result
 }
