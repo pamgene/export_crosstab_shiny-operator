@@ -2,6 +2,7 @@ library(shiny)
 library(tercen)
 library(dplyr)
 library(writexl)
+library(tidyr)
 
 ############################################
 #### This part should not be modified
@@ -42,14 +43,17 @@ shinyServer(function(input, output, session) {
   })
   
   output$summary <- renderText({
-    ctx       <- getCtx(session)
-    raw_data  <- rawData()
-    col_names <- ctx$cnames %>% unlist()
-    row_names <- ctx$rnames %>% unlist()
+    ctx         <- getCtx(session)
+    raw_data    <- rawData()
+    col_names   <- ctx$cnames %>% unlist()
+    row_names   <- ctx$rnames %>% unlist()
+    yaxis_names <- unlist(ctx$yAxis)
+    
     paste(paste("Number of rows:", nrow(raw_data)),
           paste("Number of cols:", ncol(raw_data)),
           paste("Row names:",  paste(row_names, collapse = ",")),
-          paste("Column names:",  paste(col_names, collapse = ",")), sep="\n")
+          paste("Column names:",  paste(col_names, collapse = ",")),
+          paste("Values:",  paste(yaxis_names, collapse = ",")), sep="\n")
   })
   
   output$downloadData <- downloadHandler(
@@ -70,17 +74,38 @@ getRawData <- function(session) {
   getCtx(session)$as.matrix()  
 }
 
+make.wide <- function(df) {
+  df %>% 
+    arrange(.axisIndex) %>% 
+    mutate(col = as.factor(paste(.ci, .axisIndex, sep = "_"))) %>% 
+    select(col, .y) %>% 
+    pivot_wider(names_from = col, values_from = .y)
+}
+
 getData <- function(session, raw_data, collapse_cols, collapse_rows) {
-  ctx        <- getCtx(session)
-  row_names  <- names(ctx$rnames)
-  col_values <- ctx$cselect()
-  row_values <- ctx$rselect()
+  ctx         <- getCtx(session)
+  row_names   <- names(ctx$rnames)
+  col_values  <- ctx$cselect()
+  row_values  <- ctx$rselect()
+  yaxis_names <- unlist(ctx$yAxis)
+  
+  if (length(yaxis_names) > 1) {
+    raw_data <- ctx$select() %>% 
+      select(".ri", ".ci", ".axisIndex", ".y") %>% 
+      group_by(.ri) %>% 
+      do(make.wide(.)) %>% 
+      ungroup() %>% 
+      select(-.ri)
+  }
   
   new_col_names <- col_values
   if (ncol(col_values) == 1) {
     new_col_names <- new_col_names %>% pull()
   } else {
     if (collapse_cols) {
+      col_values <- do.call(rbind, (lapply(yaxis_names, FUN = function(x) col_values %>% 
+                                             mutate(Type = x) %>%
+                                             select(Type, everything()))))
       new_col_names <- col_values %>% 
         mutate(newcol = apply(col_values[, colnames(col_values)], 1, paste, collapse = "_")) %>% 
         pull(newcol)
