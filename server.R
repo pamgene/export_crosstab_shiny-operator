@@ -4,6 +4,7 @@ library(dplyr)
 library(writexl)
 library(tidyr)
 library(shinyjs)
+library(data.table)
 
 ############################################
 #### This part should not be modified
