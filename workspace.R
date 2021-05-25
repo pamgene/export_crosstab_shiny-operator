@@ -3,6 +3,7 @@ library(tercen)
 library(dplyr)
 library(writexl)
 library(tidyr)
+library(shinyjs)
 
 ############################################
 #### This part should not be included in ui.R and server.R scripts
@@ -20,8 +21,9 @@ getCtx <- function(session) {
 ############################################
 
 ui <- shinyUI(fluidPage(
+  useShinyjs(),
   uiOutput("reacOut"),
-  title = "Export Crosstab"
+  title = "Export View Data"
 ))
 
 server <- shinyServer(function(input, output, session) {
@@ -36,11 +38,11 @@ server <- shinyServer(function(input, output, session) {
   
   output$reacOut <- renderUI({
     tagList(
-      HTML("<h3><center>Export Crosstab</center></h3>"),
+      HTML("<h3><center>Export View Data</center></h3>"),
       fluidRow(
         column(1),
         column(5, verbatimTextOutput("summary")),
-        column(2, shiny::downloadButton("downloadData", "Export Crosstab file")),
+        column(2, shiny::downloadButton("downloadData", "Export data")),
         column(1, checkboxInput("collapseCols", "Collapse columns", TRUE)),
         column(1, checkboxInput("collapseRows", "Collapse rows", TRUE)),
         column(1, radioButtons("format", "File format", choices = c("tsv", "xlsx"), selected = "tsv")))
@@ -66,13 +68,31 @@ server <- shinyServer(function(input, output, session) {
       paste0("export.", input$format)
     },
     content = function(con) {
+      data <- dataInput()
       if (input$format == "tsv") {
-        write.table(dataInput(), con, sep="\t", col.names = TRUE, row.names = FALSE)
+        if (class(data) == "list") {
+          # write headers + data
+          cat(data[[1]], file = con)
+          fwrite(x = data[[2]], file = con, sep = "\t", col.names = TRUE, append = TRUE)
+        } else if (class(data) == "data.frame") {
+          write.table(data, con, sep="\t", col.names = TRUE, row.names = FALSE)
+        }
       } else {
-        write_xlsx(dataInput(), con)
+        write_xlsx(data, con)
       }
     }
   )
+  
+  # crosstab format only supported in tsv format
+  observeEvent(input$format, {
+    if (input$format == "xlsx") {
+      updateCheckboxInput(session, inputId = "collapseCols", label = "Collapse columns", value = TRUE)
+      shinyjs::disable(id = "collapseCols")
+    } else {
+      shinyjs::enable(id = "collapseCols")
+    }
+  })
+  
 })
 
 getRawData <- function(session) {
@@ -94,6 +114,7 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
   row_values  <- ctx$rselect()
   yaxis_names <- unlist(ctx$yAxis)
   
+  # in case of multiple layers: create a structure like as.matrix() but with additional columns
   if (length(yaxis_names) > 1) {
     raw_data <- ctx$select() %>% 
         select(".ri", ".ci", ".axisIndex", ".y") %>% 
@@ -102,40 +123,70 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
         ungroup() %>% 
         select(-.ri)
   }
-  
-  new_col_names <- col_values
-  if (ncol(col_values) == 1) {
-    new_col_names <- new_col_names %>% pull()
-  } else {
-    if (collapse_cols) {
-      col_values <- do.call(rbind, (lapply(yaxis_names, FUN = function(x) col_values %>% 
-                                             mutate(Type = x) %>%
-                                             select(Type, everything()))))
-      new_col_names <- col_values %>% 
-        mutate(newcol = apply(col_values[, colnames(col_values)], 1, paste, collapse = "_")) %>% 
-        pull(newcol)
-    } else {
+
+  # collapsed view  
+  if (collapse_cols) {
+    new_col_names <- col_values
+    if (ncol(col_values) == 1) {
       new_col_names <- new_col_names %>% pull()
+    } else {
+        col_values <- do.call(rbind, (lapply(yaxis_names, FUN = function(x) col_values %>% 
+                                               mutate(Type = x) %>%
+                                               select(Type, everything()))))
+        new_col_names <- col_values %>% 
+          mutate(newcol = apply(col_values[, colnames(col_values)], 1, paste, collapse = "_")) %>% 
+          pull(newcol)
     }
+    
+    new_row_names <- row_names
+    if (ncol(row_values) == 1) {
+      result <- cbind(row_values, data.frame(raw_data))
+    } else {
+      if (collapse_rows) {
+        new_row_names  <- paste(row_names, collapse = "_")
+        new_row_values <- row_values %>% 
+          mutate(!!new_row_names := apply(row_values[, colnames(row_values)], 1, paste, collapse = "_")) %>% 
+          pull(!!new_row_names)
+        result <- data.frame(raw_data) %>% 
+          mutate(!!new_row_names := new_row_values) %>% 
+          select(!!new_row_names, everything())
+      } else {
+        result <- cbind(row_values, data.frame(raw_data))
+      }
+    }
+    colnames(result) <- c(new_row_names, new_col_names)
   }
-  
-  new_row_names <- row_names
-  if (ncol(row_values) == 1) {
-    result <- cbind(row_values, data.frame(raw_data))
-  } else {
+  # crosstab view
+  else {
+    new_col_names     <- rep("", nrow(col_values))
     if (collapse_rows) {
       new_row_names  <- paste(row_names, collapse = "_")
       new_row_values <- row_values %>% 
         mutate(!!new_row_names := apply(row_values[, colnames(row_values)], 1, paste, collapse = "_")) %>% 
         pull(!!new_row_names)
-      result <- data.frame(raw_data) %>% 
+      df <- data.frame(raw_data) %>% 
         mutate(!!new_row_names := new_row_values) %>% 
         select(!!new_row_names, everything())
+      colnames(df)      <- c(new_row_names, new_col_names)  
     } else {
-      result <- cbind(row_values, data.frame(raw_data))
-    }
+      df                <- cbind(row_values, data.frame(raw_data))
+      new_row_names     <- row_names
+    } 
+    colnames(df)      <- c(new_row_names, new_col_names)
+    headers           <- t(col_values)
+    colnames(headers) <- rep("", ncol(headers))
+    headers           <- paste(do.call(what = paste, args = c(lapply(seq(nrow(headers)), FUN = function(i) {
+        empty_cols <- rep(" ", length(new_row_names) - 1)
+        result     <- paste(headers[i,], collapse = "\t")
+        if (length(yaxis_names) > 1) {
+          result <- paste(rep(result, length(yaxis_names)), collapse = "\t")
+        }
+        result <- paste(c(empty_cols, rownames(headers)[i], result), collapse = "\t")
+        result
+      }), sep = "\n")
+    ), "\n") 
+    result <- list(headers, df)
   }
-  colnames(result) <- c(new_row_names, new_col_names)
   result
 }
 

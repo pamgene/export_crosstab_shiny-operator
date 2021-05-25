@@ -1,6 +1,7 @@
 library(shiny)
 
 shinyUI(fluidPage(
+  useShinyjs(),
   uiOutput("reacOut"),
-  title = "Export Crosstab"
+  title = "Export View Data"
 ))
