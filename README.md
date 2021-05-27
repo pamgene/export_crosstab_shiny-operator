@@ -2,18 +2,15 @@
 
 ##### Description
 
-The `export_crosstab_shiny_operator` is used to export a view in Tercen in the crosstab file format.
+The `export_crosstab_shiny_operator` is used to export a view in Tercen in the crosstab file format as well as other formats.
 
 ##### Usage
 
 Input projection|.
 ---|---
-`x-axis`        | type, description 
-`y-axis`        | type, description 
-`row`           | type, description 
-`column`        | type, description 
-`colors`        | type, description 
-`labels`        | type, description 
+`row`   | represents the variables (e.g. ID)
+`col`   | represents the category (e.g. barcode, Row, Factor1)
+`y-axis`| measurement value
 
 Output relations|.
 ---|---
@@ -21,7 +18,7 @@ Output relations|.
 
 ##### Details
 
-Details on the computation.
+The operator is used to export Tercen view data to a file. The file type can be either `tsv` or `xlsx`. The file format can be the crosstab format or a collapsed format (when collapsed columns is enabled). There is a separate option to collapse the rows. The operator allows the export of multiple data layers. Furthermore, the text are in the app shows the dimensions of the input data.
 
 ##### See Also
 
