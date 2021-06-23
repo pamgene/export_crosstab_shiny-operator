@@ -170,17 +170,23 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
     colnames(df)      <- c(new_row_names, new_col_names)
     headers           <- t(col_values)
     colnames(headers) <- rep("", ncol(headers))
-    headers           <- paste(do.call(what = paste, args = c(lapply(seq(nrow(headers)), FUN = function(i) {
+    header_lines      <- paste(do.call(what = paste, args = c(lapply(seq(nrow(headers) + length(yaxis_names) - 1), FUN = function(i) {
       empty_cols <- rep(" ", length(new_row_names) - 1)
-      result     <- paste(headers[i,], collapse = "\t")
-      if (length(yaxis_names) > 1) {
-        result <- paste(rep(result, length(yaxis_names)), collapse = "\t")
+      if (i <= nrow(headers)) {
+        result     <- paste(headers[i,], collapse = "\t")
+        if (length(yaxis_names) > 1) {
+          result <- paste(rep(result, length(yaxis_names)), collapse = "\t")
+        }
+        result <- paste(c(empty_cols, rownames(headers)[i], result), collapse = "\t")
+      } else {
+        # add a row containing quantitation type name
+        yaxis_line <- unlist(lapply(yaxis_names, FUN = function(name) rep(name, length(headers[1,]))))
+        result     <- paste(c(empty_cols, "Y-axis", yaxis_line), collapse = "\t")
       }
-      result <- paste(c(empty_cols, rownames(headers)[i], result), collapse = "\t")
       result
     }), sep = "\n")
     ), "\n") 
-    result <- list(headers, df)
+    result <- list(header_lines, df)
   }
   result
 }
