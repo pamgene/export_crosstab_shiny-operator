@@ -1,7 +1,7 @@
 library(shiny)
 library(shinyjs)
 
-shinyUI(fluidPage(
+ui <- shinyUI(fluidPage(
   shinyjs::useShinyjs(),
   tags$script(
     HTML(

@@ -21,7 +21,7 @@ getCtx <- function(session) {
 ####
 ############################################
 
-shinyServer(function(input, output, session) {
+server <- shinyServer(function(input, output, session) {
   
   rawData <- reactive({
     getRawData(session)
@@ -91,12 +91,18 @@ shinyServer(function(input, output, session) {
 })
 
 getRawData <- function(session) {
-  getCtx(session)$as.matrix()  
+  result <- NULL
+  tryCatch({
+    ctx    <- getCtx(session)
+    result <- ctx$as.matrix()
+  }, error = function(e) {
+    stop("Data could not be loaded: is your view setup correctly")
+  })
+  result
 }
 
 make.wide <- function(df) {
-  df %>% 
-    arrange(.axisIndex) %>% 
+  df %>%
     mutate(col = as.factor(paste(.ci, .axisIndex, sep = "_"))) %>% 
     select(col, .y) %>% 
     pivot_wider(names_from = col, values_from = .y)
@@ -125,9 +131,12 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
     if (ncol(col_values) == 1) {
       new_col_names <- new_col_names %>% pull()
     } else {
-      col_values <- do.call(rbind, (lapply(yaxis_names, FUN = function(x) col_values %>% 
-                                             mutate(Type = x) %>%
-                                             select(Type, everything()))))
+      col_values <- do.call(rbind, (lapply(seq_along(yaxis_names), FUN = function(i, y = yaxis_names) col_values %>% 
+                                             mutate(Type = y[i]) %>%
+                                             mutate(rowseq = seq(i, i + (nrow(col_values) - 1) * length(yaxis_names), length(yaxis_names))) %>%
+                                             select(Type, everything())))) %>%
+        arrange(rowseq) %>%
+        select(-rowseq)
       new_col_names <- col_values %>% 
         mutate(newcol = apply(col_values[, colnames(col_values)], 1, paste, collapse = "_")) %>% 
         pull(newcol)
@@ -180,7 +189,7 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
         result <- paste(c(empty_cols, rownames(headers)[i], result), collapse = "\t")
       } else {
         # add a row containing quantitation type name
-        yaxis_line <- unlist(lapply(yaxis_names, FUN = function(name) rep(name, length(headers[1,]))))
+        yaxis_line <- rep(yaxis_names, length(headers[1,]))
         result     <- paste(c(empty_cols, "Y-axis", yaxis_line), collapse = "\t")
       }
       result
