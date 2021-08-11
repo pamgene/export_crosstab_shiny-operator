@@ -58,6 +58,12 @@ server <- shinyServer(function(input, output, session) {
           paste("Values:",  paste(yaxis_names, collapse = ",")), sep="\n")
   })
   
+  # write headers + data
+  write_list_data <- function(data, con) {
+    cat(data[[1]], file = con)
+    fwrite(x = data[[2]], file = con, sep = "\t", col.names = TRUE, append = TRUE)
+  }
+  
   output$downloadData <- downloadHandler(
     filename = function() {
       paste0("export.", input$format)
@@ -66,28 +72,19 @@ server <- shinyServer(function(input, output, session) {
       data <- dataInput()
       if (input$format == "tsv") {
         if (class(data) == "list") {
-          # write headers + data
-          cat(data[[1]], file = con)
-          fwrite(x = data[[2]], file = con, sep = "\t", col.names = TRUE, append = TRUE)
+          write_list_data(data, con)
         } else if (class(data) == "data.frame") {
           write.table(data, con, sep="\t", col.names = TRUE, row.names = FALSE)
         }
       } else {
-        write_xlsx(data, con)
+        if (class(data) == "list") {
+          write_list_data(data, con)
+        } else if (class(data) == "data.frame") {
+          write_xlsx(data, con)
+        }
       }
     }
   )
-  
-  # crosstab format only supported in tsv format
-  observeEvent(input$format, {
-    if (input$format == "xlsx") {
-      updateCheckboxInput(session, inputId = "collapseCols", label = "Collapse columns", value = TRUE)
-      shinyjs::disable(id = "collapseCols")
-    } else {
-      shinyjs::enable(id = "collapseCols")
-    }
-  })
-  
 })
 
 getRawData <- function(session) {
