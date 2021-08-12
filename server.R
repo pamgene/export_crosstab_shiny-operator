@@ -78,7 +78,12 @@ server <- shinyServer(function(input, output, session) {
         }
       } else {
         if (class(data) == "list") {
-          write_list_data(data, con)
+          # write to temp csv file and convert to xlsx
+          tmp_csv_file = tempfile()
+          write_list_data(data, tmp_csv_file)
+          csv_data <- read.csv(tmp_csv_file, sep = "\t", check.names = FALSE)
+          write_xlsx(csv_data, con)
+          on.exit(unlink(tmp_csv_file))
         } else if (class(data) == "data.frame") {
           write_xlsx(data, con)
         }
