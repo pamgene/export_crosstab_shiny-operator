@@ -110,6 +110,21 @@ make.wide <- function(df) {
     pivot_wider(names_from = col, values_from = .y)
 }
 
+get_crosstab_view_header_row <- function(yaxis_names, headers, empty_cols, layer_count, i) {
+  result <- paste(headers[i,], collapse = "\t")
+  if (length(yaxis_names) > 1) {
+    result <- paste(unlist(lapply(headers[i,], FUN = function(x) rep(x, layer_count))), collapse = "\t")
+  }
+  result <- paste(c(empty_cols, rownames(headers)[i], result), collapse = "\t")
+  result
+}
+
+get_crosstab_view_quantitation_row <- function(yaxis_names, headers, empty_cols, yaxis_line) {
+  yaxis_line <- rep(yaxis_names, length(headers[1,]))
+  result     <- paste(c(empty_cols, "Y-axis", yaxis_line), collapse = "\t")
+  result
+}
+
 getData <- function(session, raw_data, collapse_cols, collapse_rows) {
   ctx         <- getCtx(session)
   row_names   <- names(ctx$rnames)
@@ -183,22 +198,25 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
     colnames(df)      <- c(new_row_names, new_col_names)
     headers           <- t(col_values)
     colnames(headers) <- rep("", ncol(headers))
-    header_lines      <- paste(do.call(what = paste, args = c(lapply(seq(nrow(headers) + length(yaxis_names) - 1), FUN = function(i) {
-      empty_cols <- rep(" ", length(new_row_names) - 1)
-      if (i <= nrow(headers)) {
-        result     <- paste(headers[i,], collapse = "\t")
-        if (length(yaxis_names) > 1) {
-          result <- paste(unlist(lapply(headers[i,], FUN = function(x) rep(x, layer_count))), collapse = "\t")
+    header_length     <- nrow(headers) + length(yaxis_names) - 1
+    empty_cols        <- rep(" ", length(new_row_names) - 1)
+    
+    if (header_length == 1) {
+      row1         <- get_crosstab_view_header_row(yaxis_names, headers, empty_cols, layer_count, 1)
+      row2         <- get_crosstab_view_quantitation_row(yaxis_names, headers, empty_cols, yaxis_line)
+      header_lines <- paste(paste(row1, row2, sep = "\n"), "\n")
+    }
+    else if (header_length > 1) {
+      header_lines      <- paste(do.call(what = paste, args = c(lapply(seq(header_length), FUN = function(i) {
+        if (i <= nrow(headers)) {
+          result <- get_crosstab_view_header_row(yaxis_names, headers, empty_cols, layer_count, i)
+        } else {
+          result <- get_crosstab_view_quantitation_row(yaxis_names, headers, empty_cols, yaxis_line)
         }
-        result <- paste(c(empty_cols, rownames(headers)[i], result), collapse = "\t")
-      } else {
-        # add a row containing quantitation type name
-        yaxis_line <- rep(yaxis_names, length(headers[1,]))
-        result     <- paste(c(empty_cols, "Y-axis", yaxis_line), collapse = "\t")
-      }
-      result
-    }), sep = "\n")
-    ), "\n") 
+        result
+      }), sep = "\n")
+      ), "\n")
+    }
     result <- list(header_lines, df)
   }
   result
