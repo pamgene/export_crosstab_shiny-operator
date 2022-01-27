@@ -115,10 +115,11 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
   row_names   <- names(ctx$rnames)
   col_values  <- ctx$cselect()
   row_values  <- ctx$rselect()
-  yaxis_names <- unlist(ctx$yAxis)
+  yaxis_names <- rev(unlist(ctx$yAxis))
+  layer_count <- length(yaxis_names)
   
   # in case of multiple layers: create a structure like as.matrix() but with additional columns
-  if (length(yaxis_names) > 1) {
+  if (layer_count > 1) {
     raw_data <- ctx$select() %>% 
       select(".ri", ".ci", ".axisIndex", ".y") %>% 
       group_by(.ri) %>% 
@@ -132,6 +133,7 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
     new_col_names <- col_values
     if (ncol(col_values) == 1) {
       new_col_names <- new_col_names %>% pull()
+      new_col_names <- unlist(lapply(new_col_names, FUN = function(x) paste(yaxis_names, x, sep = ".")))
     } else {
       col_values <- do.call(rbind, (lapply(seq_along(yaxis_names), FUN = function(i, y = yaxis_names) col_values %>% 
                                              mutate(Type = y[i]) %>%
@@ -164,7 +166,7 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
   }
   # crosstab view
   else {
-    new_col_names     <- rep("", nrow(col_values))
+    new_col_names     <- rep("", nrow(col_values) * layer_count)
     if (collapse_rows) {
       new_row_names  <- paste(row_names, collapse = "_")
       new_row_values <- row_values %>% 
@@ -186,7 +188,7 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
       if (i <= nrow(headers)) {
         result     <- paste(headers[i,], collapse = "\t")
         if (length(yaxis_names) > 1) {
-          result <- paste(rep(result, length(yaxis_names)), collapse = "\t")
+          result <- paste(unlist(lapply(headers[i,], FUN = function(x) rep(x, layer_count))), collapse = "\t")
         }
         result <- paste(c(empty_cols, rownames(headers)[i], result), collapse = "\t")
       } else {
