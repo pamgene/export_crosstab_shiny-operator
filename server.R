@@ -111,11 +111,15 @@ make.wide <- function(df) {
 }
 
 get_crosstab_view_header_row <- function(yaxis_names, headers, empty_cols, layer_count, i) {
-  result <- paste(headers[i,], collapse = "\t")
-  if (length(yaxis_names) > 1) {
-    result <- paste(unlist(lapply(headers[i,], FUN = function(x) rep(x, layer_count))), collapse = "\t")
+  result <- ""
+  header <- headers[i,]
+  if (header != "") {
+    result <- paste(header, collapse = "\t")
+    if (length(yaxis_names) > 1) {
+      result <- paste(unlist(lapply(headers[i,], FUN = function(x) rep(x, layer_count))), collapse = "\t")
+    }
+    result <- paste(c(empty_cols, rownames(headers)[i], result), collapse = "\t")
   }
-  result <- paste(c(empty_cols, rownames(headers)[i], result), collapse = "\t")
   result
 }
 
@@ -204,7 +208,11 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
     if (header_length == 1) {
       row1         <- get_crosstab_view_header_row(yaxis_names, headers, empty_cols, layer_count, 1)
       row2         <- get_crosstab_view_quantitation_row(yaxis_names, headers, empty_cols, yaxis_line)
-      header_lines <- paste(paste(row1, row2, sep = "\n"), "\n")
+      if (row1 == "") {
+        header_lines <- paste(row2, "\n")
+      } else {
+        header_lines <- paste(paste(row1, row2, sep = "\n"), "\n")
+      }
     }
     else if (header_length > 1) {
       header_lines      <- paste(do.call(what = paste, args = c(lapply(seq(header_length), FUN = function(i) {
