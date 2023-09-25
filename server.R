@@ -134,13 +134,14 @@ getData <- function(session, raw_data, collapse_cols, collapse_rows) {
   row_names   <- names(ctx$rnames)
   col_values  <- ctx$cselect()
   row_values  <- ctx$rselect()
-  yaxis_names <- rev(unlist(ctx$yAxis))
+  yaxis_names <- unlist(ctx$yAxis)
   layer_count <- length(yaxis_names)
-  
+
   # in case of multiple layers: create a structure like as.matrix() but with additional columns
   if (layer_count > 1) {
     raw_data <- ctx$select() %>% 
       select(".ri", ".ci", ".axisIndex", ".y") %>% 
+      arrange(.ri, .ci, .axisIndex) %>%
       group_by(.ri) %>% 
       do(make.wide(.)) %>% 
       ungroup() %>% 
