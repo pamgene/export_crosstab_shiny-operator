@@ -3,5 +3,5 @@
   "description": "Export a view from Tercen in crosstab file format.",
   "tags": ["shiny"],
   "authors": ["tercen"],
-  "urls": ["https://github.com/tercen/export_crosstab_shiny_operator"]
+  "urls": ["https://github.com/pamgene/export_crosstab_shiny_operator"]
 }
